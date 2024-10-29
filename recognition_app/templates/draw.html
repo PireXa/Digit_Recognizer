@@ -1,0 +1,181 @@
+<!-- draw.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Draw Canvas</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="drawingCanvas" width="400" height="400"></canvas>
+    <button id="submitButton">Submit</button>
+    <button id="clearButton">Clear Canvas</button>
+    <button id="trainButton">Train Model</button>
+    <button id="createModelButton">Create Model</button>
+
+    <form id="trainForm" method="POST">
+        {% csrf_token %}
+        <!-- Add your form fields here, e.g., model name, parameters -->
+        <input type="number" name="epochs" placeholder="Enter number of training iterations" required>
+        <button type="submit">Train Model</button>
+    </form>
+
+    <form method="POST" id="drawingForm">
+        {% csrf_token %}
+        <label for="modelSelect">Select Model:</label>
+        <select id="modelSelect" name="model_name">
+            {% if model_files %}
+                {% for model in model_files %}
+                    <option value="{{ model }}">{{ model }}</option>
+                {% endfor %}
+            {% else %}
+                <option value="" disabled selected>No models available</option>
+            {% endif %}
+        </select>
+        <button type="submit">Submit Drawing</button>
+    </form>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        let drawing = false;
+        ctx.lineWidth = 30;
+        ctx.strokeStyle = 'black';
+
+        // Start drawing
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true;
+            ctx.moveTo(e.offsetX, e.offsetY);
+        });
+
+        // Draw on canvas
+        canvas.addEventListener('mousemove', (e) => {
+            if (drawing) {
+                ctx.lineTo(e.offsetX, e.offsetY);
+                ctx.stroke();
+            }
+        });
+
+        // Stop drawing
+        canvas.addEventListener('mouseup', () => {
+            drawing = false;
+            ctx.beginPath();
+        });
+
+        document.getElementById('drawingForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixelData = imageData.data; // This is a Uint8ClampedArray
+            const dataToSend = Array.from(pixelData); // Convert to a regular array
+            // console.log(document.querySelector('select[name="model_name"]').value);
+
+            //clean up the data
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            fetch('/submit-drawing/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}' // Add CSRF token for security
+                },
+                body: JSON.stringify({
+                    pixel_data: dataToSend,
+                    model_name: document.querySelector('select[name="model_name"]').value
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayImage(data.image, data.predicted_class);
+                console.log('Success:', data);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        });
+
+        // Collect pixel data and send to backend
+        document.getElementById('submitButton').addEventListener('click', () => {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const pixelData = imageData.data; // This is a Uint8ClampedArray
+
+            // Convert pixel data to an array or some format to send
+            const dataToSend = Array.from(pixelData); // Convert to a regular array
+
+            //clean up the data
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Send data to backend
+            fetch('/submit-drawing/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}' // Add CSRF token for security
+                },
+                body: JSON.stringify(dataToSend)
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayImage(data.image, data.predicted_class);
+                console.log('Success:', data);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        });
+
+        function displayImage(base64Image, prediction) {
+            const img = document.createElement('img'); // Create a new image element
+            img.src = 'data:image/png;base64,' + base64Image; // Set the source to the base64 string
+            img.style.display = 'block'; // Optional: make sure the image is block-level
+            img.style.marginTop = '20px'; // Optional: add some space above the image
+            //remove previous image
+            if (document.getElementsByTagName('img').length > 0) {
+                document.getElementsByTagName('img')[0].remove();
+                document.getElementsByTagName('p')[0].remove();
+            }
+            document.body.appendChild(img); // Append the image to the body or a specific container
+            // Display the prediction
+            const predictionText = document.createElement('p');
+            predictionText.textContent = `Prediction: ${prediction}`;
+            document.body.appendChild(predictionText);
+        }
+
+        document.getElementById('clearButton').addEventListener('click', () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+        });
+
+        document.getElementById('trainForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            const epochs = document.querySelector('input[name="epochs"]').value;
+            fetch('/train-model/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}' // Add CSRF token for security
+                },
+                body: JSON.stringify({
+                    epochs: epochs
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        });
+
+        document.getElementById('createModelButton').addEventListener('click', () => {
+            window.location.href = '/create-model/';
+        });
+
+    </script>
+</body>
+</html>
+

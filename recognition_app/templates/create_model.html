@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create New Model</title>
+</head>
+<body>
+    <h1>Create a New Model</h1>
+    <form id="createModelForm" method="POST">
+        {% csrf_token %}
+        <!-- Add your form fields here, e.g., model name, parameters -->
+        <input type="text" name="model_name" placeholder="Enter model name" required>
+        <input type="number" name="num_layers" placeholder="Enter number of layers" required>
+        <button type="submit">Create Model</button>
+    </form>
+    <a href="/canvas/">Back to Drawing</a> <!-- Link back to the drawing page -->
+
+    <script>
+        document.getElementById('createModelForm').addEventListener('submit', (event) => {
+            event.preventDefault();
+            //retrieve name of the model
+            const modelName = document.querySelector('input[name="model_name"]').value;
+            // console.log(modelName);
+
+            fetch('/submit-model/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    model_name: modelName
+                })
+            }).then(response => {
+                if (response.ok) {
+                    // alert('Model created successfully!');
+                    console.log('Model created successfully!');
+                } else {
+                    // alert('Failed to create model.');
+                    console.log('Failed to create model.');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
